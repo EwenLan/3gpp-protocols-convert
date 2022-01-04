@@ -1,88 +1,16 @@
-from _typeshed import Self
-from abc import abstractclassmethod
 import logging
+from expression import EnumExpression, ImportExpression, MappedTypeExpression, TsExpression
 from interface import TypeInfo
 from log import Log
 import copy
 import typing
 from schema import ObjectProperty
-import common
 import typeinfo
 
 log: logging.Logger = Log(__name__).getLogger()
 
 spaceIndent: int = 4
 blankRowsBetweenExpressions = 2
-
-
-class TsExpression(object):
-    @abstractclassmethod
-    def ToString(self) -> str:
-        return ""
-
-
-class ImportExpression(TsExpression):
-    importedFile: str
-    typeNames: typing.List[str]
-
-    def __init__(self, typeNames: typing.List[str], importedFile: str) -> None:
-        super().__init__()
-        self.importedFile = importedFile
-        self.typeNames = copy.deepcopy(typeNames)
-
-    def CheckIfImportedFileEqual(self, importedFile: str) -> bool:
-        return self.importedFile == importedFile
-
-    def AddImportType(self, typeName: str):
-        if not typeName in self.typeNames:
-            self.typeNames.append(typeName)
-
-    def ToString(self) -> str:
-        ans: str = "import {"
-        if len(self.typeNames) > 0:
-            ans += "{}".format(self.typeNames[0])
-        for i in range(1, len(self.typeNames), 1):
-            ans += ", {}".format(self.typeNames[i])
-        ans += "}} from \"{}\"".format(self.importedFile)
-        return ans
-
-
-class TypeDefineExpression(TsExpression):
-    typeName: str
-
-    def __init__(self, typeName: str) -> None:
-        super().__init__()
-        self.typeName = typeName
-
-
-class MappedTypeExpression(TypeDefineExpression):
-    originType: typeinfo.TsTypeInfo
-
-    def __init__(self, typeName: str, originType: typeinfo.TsTypeInfo) -> None:
-        super().__init__(typeName)
-        self.originType = originType
-
-    def ToString(self) -> str:
-        return "export type {} = {}".format(self.typeName, self.originType.ToString())
-
-
-class EnumExpression(TypeDefineExpression):
-    enumValues: typing.List[str]
-
-    def __init__(self, typeName: str, enumValues: typing.List[str]) -> None:
-        super().__init__(typeName)
-        self.enumValues = copy.deepcopy(enumValues)
-
-    def ToString(self) -> str:
-        log.debug("export enum type %s, options num %d",
-                  self.typeName, len(self.enumValues))
-        ans: str = "export enum {} {{\n".format(self.typeName)
-        for i in self.enumValues:
-            ans += " " * spaceIndent
-            ans += "{} = \"{}\",\n".format(
-                common.TransformIdentifier(i), i)
-        ans += "}"
-        return ans
 
 
 class TsObjectProperty:
@@ -155,10 +83,6 @@ class TsFileWritter:
         self.expressions.append(
             MappedTypeExpression(typeName, originType))
 
-    def MappedArrayType(self, typeName: str, elementType: str):
-        self.expressions.append(
-            MappedArrayTypeExpression(typeName, elementType))
-
     def Enum(self, typeName: str, enumValues: typing.List[str]):
         self.expressions.append(EnumExpression(
             typeName, copy.deepcopy(enumValues)))
@@ -191,7 +115,7 @@ def convertToTsObjectProperty(property: ObjectProperty) -> TsObjectProperty:
         log.error("fail to get type info, property %s",
                   property.GetPropertyName())
         return None
-    return TsObjectProperty(property.GetPropertyName(), , property.GetRequired())
+    return TsObjectProperty(property.GetPropertyName(), typeinfo.TsSimpleTypeInfo(typeinfo.TsType(typeInfo.GetImportFrom(), typeInfo.GetTypeName())), property.GetRequired())
 
 
 class TsAdapter:
